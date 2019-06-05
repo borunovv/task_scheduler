@@ -121,25 +121,6 @@ class Task<T> implements Delayed {
     }
 
     /**
-     * Atomic state change.
-     *
-     * @param expectedState expected current state
-     * @param newState      new state
-     * @return {@code true} on success
-     */
-    private boolean tryChangeState(State expectedState, State newState) {
-        if (state.compareAndSet(expectedState, newState)) {
-            if (newState == State.ERROR || newState == State.SUCCESS || newState == State.CANCELLED) {
-                synchronized (doneMonitor) {
-                    doneMonitor.notifyAll();
-                }
-            }
-            return true;
-        }
-        return false;
-    }
-
-    /**
      * Cancel the task.
      *
      * @return {@code false} if the task could not be cancelled,
@@ -164,7 +145,7 @@ class Task<T> implements Delayed {
      * @return task state (one of CANCELLED, SUCCESS, ERROR)
      * @throws InterruptedException if waiting was interrupted
      */
-    public State waitFinalState() throws InterruptedException {
+    State waitFinalState() throws InterruptedException {
         return waitFinalStateLocal(TIMEOUT_INFINITE, null);
     }
 
@@ -175,7 +156,7 @@ class Task<T> implements Delayed {
      * @return current task state (could be any)
      * @throws InterruptedException if waiting was interrupted
      */
-    public State waitFinalState(long timeout, TimeUnit unit) throws InterruptedException {
+    State waitFinalState(long timeout, TimeUnit unit) throws InterruptedException {
         if (timeout < 0) {
             throw new IllegalArgumentException("Expected timeout >= 0, actual: " + timeout);
         }
@@ -185,14 +166,14 @@ class Task<T> implements Delayed {
     /**
      * @return the task execution error (if so), or {@code null} if no error occurred.
      */
-    public Throwable getError() {
+    Throwable getError() {
         return error.get();
     }
 
     /**
      * @return the task execution result (if task already done), or {@code null} otherwise.
      */
-    public T getResult() {
+    T getResult() {
         return result.get();
     }
 
@@ -224,5 +205,24 @@ class Task<T> implements Delayed {
                 return state.get();
             }
         }
+    }
+
+    /**
+     * Atomic state change.
+     *
+     * @param expectedState expected current state
+     * @param newState      new state
+     * @return {@code true} on success
+     */
+    private boolean tryChangeState(State expectedState, State newState) {
+        if (state.compareAndSet(expectedState, newState)) {
+            if (newState == State.ERROR || newState == State.SUCCESS || newState == State.CANCELLED) {
+                synchronized (doneMonitor) {
+                    doneMonitor.notifyAll();
+                }
+            }
+            return true;
+        }
+        return false;
     }
 }
